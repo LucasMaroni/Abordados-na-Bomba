@@ -7,6 +7,9 @@ import time
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from streamlit.components.v1 import html
+import json
+from io import BytesIO
+import base64
 
 # -------------------- CONFIGURAÇÃO AVANÇADA --------------------
 SCOPE = ["https://spreadsheets.google.com/feeds",
@@ -83,6 +86,12 @@ def carregar_dados_otimizado(_client, sheet_id):
         st.error(f"Erro ao carregar planilha: {str(e)}")
         return {}
 
+def converter_datetime_para_string(obj):
+    """Função auxiliar para converter datetime para string durante a serialização"""
+    if isinstance(obj, (datetime, pd.Timestamp)):
+        return obj.strftime('%Y-%m-%d %H:%M:%S')
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
 def salvar_dados_eficiente(_client, sheet_id, aba_nome, df):
     """Salva dados de forma eficiente com batch processing"""
     try:
@@ -95,11 +104,18 @@ def salvar_dados_eficiente(_client, sheet_id, aba_nome, df):
         
         # Prepara dados para upload
         if not df.empty:
-            # Converte colunas de datetime para string
-            for col in df.select_dtypes(include=['datetime64[ns]']).columns:
-                df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+            # Converte todas as colunas de datetime para string
+            df = df.copy()
+            for col in df.columns:
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+                # Converte outros tipos de dados problemáticos
+                elif pd.api.types.is_numeric_dtype(df[col]):
+                    df[col] = df[col].fillna(0)
             
-            values = [df.columns.tolist()] + df.fillna('').values.tolist()
+            # Garante que todos os valores sejam strings ou números
+            values = [df.columns.tolist()] + df.astype(str).values.tolist()
+            
             worksheet.clear()
             worksheet.update(values, value_input_option='USER_ENTERED')
         
@@ -211,7 +227,7 @@ def main():
         .main-header { 
             font-size: 2.5rem; 
             color: white; 
-            text-align: center; 
+            text-align: left; 
             margin-bottom: 2rem;
             background: linear-gradient(135deg, #FF8C00 0%, #FFD700 100%);
             -webkit-background-clip: text;
@@ -219,6 +235,19 @@ def main():
             font-weight: bold;
             padding: 1rem;
             border-radius: 10px;
+            margin-left: -2rem;
+            margin-top: -2rem;
+        }
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        .logo-img {
+            height: 80px;
+            margin-right: -2rem;
+            margin-top: -2rem;
         }
         .stButton>button {
             background: linear-gradient(135deg, #FF8C00 0%, #FFD700 100%);
@@ -302,7 +331,17 @@ def main():
     
     # ----------------------- DASHBOARD -----------------------
     if "📊 Dashboard" in menu:
-        st.markdown('<h1 class="main-header">Dashboard de Abordagens</h1>', unsafe_allow_html=True)
+        # Header com título e logo
+        col_title, col_logo = st.columns([3, 1])
+        with col_title:
+            st.markdown('<h1 class="main-header">Dashboard de Abordados</h1>', unsafe_allow_html=True)
+        with col_logo:
+            # Espaço para logo - você pode substituir pela URL da sua imagem
+            st.markdown("""
+            <div style="text-align: right;">
+                <img src="https://cdn-icons-png.flaticon.com/512/1006/1006555.png" class="logo-img" alt="Logo">
+            </div>
+            """, unsafe_allow_html=True)
         
         # Adicionar OPERAÇÃO TITULAR aos dados de atendimento
         if not df_atendimentos.empty and not df_operacoes.empty:
@@ -334,7 +373,7 @@ def main():
             col1, col2 = st.columns(2)
             
             with col1:
-                # Gráfico de atendimentos por operação titular
+                # Gráfico de pizza - Atendimentos por operação titular
                 operacao_count = df_atendimentos['OPERAÇÃO TITULAR'].value_counts().head(10)
                 fig = px.pie(
                     values=operacao_count.values, 
@@ -345,16 +384,18 @@ def main():
                 st.plotly_chart(fig, use_container_width=True)
             
             with col2:
-                # Gráfico de status de revisão
-                revisao_count = df_atendimentos['REVISAO'].value_counts()
-                fig = px.bar(
-                    x=revisao_count.index, 
-                    y=revisao_count.values, 
-                    title="🔧 Status de Revisão",
-                    color=revisao_count.values,
+                # Gráfico de barras - Quantidade de atendimentos por operação titular
+                operacao_count_bar = df_atendimentos['OPERAÇÃO TITULAR'].value_counts().head(10)
+                fig_bar = px.bar(
+                    x=operacao_count_bar.index,
+                    y=operacao_count_bar.values,
+                    title="📈 Quantidade de Atendimentos por Operação Titular",
+                    labels={'x': 'Operação Titular', 'y': 'Quantidade de Atendimentos'},
+                    color=operacao_count_bar.values,
                     color_continuous_scale="oranges"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                fig_bar.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_bar, use_container_width=True)
             
             # Gráfico de média por operação titular
             st.subheader("📈 Média de Atendimento por Operação Titular")
@@ -369,7 +410,7 @@ def main():
                 color='MEDIA_ATENDIMENTO',
                 color_continuous_scale="oranges"
             )
-            fig.update_layout(yaxis_tickformat=".2f")
+            fig.update_layout(yaxis_tickformat=".2f", xaxis_tickangle=-45)
             st.plotly_chart(fig, use_container_width=True)
         
         # Últimos registros
@@ -522,7 +563,7 @@ def main():
                             format="%.2f"
                         )
                     },
-                    disabled=["OPERAÇÃO TITULAR", "OPERAÇÃO", "META", "TIPO"],
+                    disabled=["OPERAÇÃO TITULAR", "OPERAÇÃO", 'META', "TIPO"],
                     key="operacoes_table"
                 )
                 
@@ -640,7 +681,7 @@ def main():
                 
                 if submitted and acesso_permitido:
                     novo_veiculo = pd.DataFrame({
-                        'PLACA': [placa],
+                        'PLACA': [placa.upper()],
                         'MARCA': [marca],
                         'MODELO': [modelo],
                         'OPERAÇÃO': [operacao],
