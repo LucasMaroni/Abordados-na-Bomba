@@ -1,1 +1,6 @@
-pip install gspread oauth2client
+streamlit
+pandas
+plotly
+numpy
+gspread
+oauth2client
