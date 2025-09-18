@@ -294,12 +294,9 @@ def main():
     <style>
         .main-header { 
             font-size: 2.5rem; 
-            color: white; 
+            color: black; 
             text-align: left; 
             margin-bottom: 1rem;
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             font-weight: bold;
             padding: 1rem;
             border-radius: 10px;
@@ -615,19 +612,14 @@ def main():
         with col2:
             st.subheader("📋 Operações Cadastradas")
             
-            # Botão de exportação
+            # Botão de exportação (CSV em vez de Excel)
             if not df_operacoes.empty:
-                # Converter para Excel
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df_operacoes.to_excel(writer, index=False, sheet_name='Operações')
-                excel_data = output.getvalue()
-                
+                csv = df_operacoes.to_csv(index=False, sep=';')
                 st.download_button(
-                    label="📤 Exportar para Excel",
-                    data=excel_data,
-                    file_name=f"operacoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    label="📤 Exportar para CSV",
+                    data=csv,
+                    file_name=f"operacoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
                     use_container_width=True
                 )
             
@@ -675,8 +667,6 @@ def main():
             st.session_state.operacao_selecionada = None
         if 'placa_digitada' not in st.session_state:
             st.session_state.placa_digitada = ""
-        if 'ocultar_info' not in st.session_state:
-            st.session_state.ocultar_info = False
         
         # Layout em 3 colunas
         col1, col2, col3 = st.columns([1, 1, 1])
@@ -697,18 +687,6 @@ def main():
                 if not veiculo_encontrado.empty:
                     veiculo_info = veiculo_encontrado.iloc[0]
                     st.success(f"✅ Placa encontrada: {placa_digitada.upper()}")
-                    
-                    # Exibir informações do veículo
-                    marca_value = veiculo_info.get("MARCA", "")
-                    modelo_value = veiculo_info.get("MODELO", "")
-                    tipo_value = veiculo_info.get("TIPO", "")
-                    operacao_value = veiculo_info.get("OPERAÇÃO", "")
-                    
-                    st.text_input("🏭 MARCA", value=marca_value, disabled=True, key="marca_veiculo")
-                    st.text_input("🔧 MODELO", value=modelo_value, disabled=True, key="modelo_veiculo")
-                    st.text_input("📋 TIPO", value=tipo_value, disabled=True, key="tipo_veiculo")
-                    st.text_input("🏢 OPERAÇÃO", value=operacao_value, disabled=True, key="operacao_veiculo")
-                    
                 else:
                     st.error("❌ Placa não encontrada. Verifique o cadastro do veículo.")
             
@@ -720,10 +698,6 @@ def main():
             data_abordagem = st.date_input("📅 DATA DE ABORDAGEM", value=datetime.today(), key="data_abordagem")
             revisao = st.selectbox("🔧 REVISÃO", options=["REVISÃO EM DIA", "PENDENTE"], key="revisao_select")
             tacografo = st.selectbox("📊 TACÓGRAFO", options=["TACÓGRAFO EM DIA", "PENDENTE"], key="tacografo_select")
-            
-            # Observação
-            observacao = st.text_area("📝 OBSERVAÇÃO", placeholder="Digite observações relevantes sobre o atendimento...", 
-                                    height=100, key="observacao_text")
         
         with col3:
             st.subheader("⏰ Período do Atendimento")
@@ -732,6 +706,10 @@ def main():
             
             # Média de atendimento
             media_atendimento = st.number_input("⭐ MÉDIA ATENDIMENTO", min_value=0.0, format="%.2f", key="media_atendimento")
+            
+            # Observação
+            observacao = st.text_area("📝 OBSERVAÇÃO", placeholder="Digite observações relevantes sobre o atendimento...", 
+                                    height=100, key="observacao_text")
         
         # SELEÇÃO DE OPERAÇÃO (abaixo das 3 colunas)
         st.subheader("🏢 Seleção de Operação")
@@ -927,19 +905,14 @@ def main():
         st.subheader("🔍 Pesquisar Veículo")
         pesquisa_placa = st.text_input("Digite a placa para pesquisar:", placeholder="Ex: ABC1234", key="pesquisa_placa")
         
-        # Botão de exportação
+        # Botão de exportação (CSV em vez de Excel)
         if not df_veiculos.empty:
-            # Converter para Excel
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_veiculos.to_excel(writer, index=False, sheet_name='Veículos')
-            excel_data = output.getvalue()
-            
+            csv = df_veiculos.to_csv(index=False, sep=';')
             st.download_button(
-                label="📤 Exportar para Excel",
-                data=excel_data,
-                file_name=f"veiculos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                label="📤 Exportar para CSV",
+                data=csv,
+                file_name=f"veiculos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
                 use_container_width=True
             )
         
@@ -1003,19 +976,14 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
         
-        # Botão de exportação
+        # Botão de exportação (CSV em vez de Excel)
         if not df_atendimentos.empty:
-            # Converter para Excel
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_atendimentos.to_excel(writer, index=False, sheet_name='Atendimentos')
-            excel_data = output.getvalue()
-            
+            csv = df_atendimentos.to_csv(index=False, sep=';')
             st.download_button(
-                label="📤 Exportar para Excel",
-                data=excel_data,
-                file_name=f"historico_atendimentos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                label="📤 Exportar para CSV",
+                data=csv,
+                file_name=f"historico_atendimentos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
                 use_container_width=True
             )
         
@@ -1049,8 +1017,8 @@ def main():
             if 'META' in df_display.columns:
                 df_display['META'] = df_display['META'].round(2)
             
-            # Aplicar formatação condicional para META vs MEDIA_ATENDIMENTO
-            def color_meta(row):
+            # Função para aplicar formatação condicional
+            def highlight_meta(row):
                 if pd.notna(row['MEDIA_ATENDIMENTO']) and pd.notna(row['META']):
                     if row['MEDIA_ATENDIMENTO'] >= row['META']:
                         return ['background-color: #d4edda; color: #155724; font-weight: bold'] * len(row)
@@ -1058,12 +1026,12 @@ def main():
                         return ['background-color: #f8d7da; color: #721c24; font-weight: bold'] * len(row)
                 return [''] * len(row)
             
-            # Exibir dados com formatação
+            # Exibir dados
             st.dataframe(
                 df_display[[
                     'PLACA', 'MOTORISTA', 'DATA_ABORDAGEM', 'OPERACAO', 
                     'OPERAÇÃO TITULAR', 'MEDIA_ATENDIMENTO', 'META', 'REVISAO', 'COLABORADOR'
-                ]].style.apply(color_meta, axis=1),
+                ]],
                 use_container_width=True,
                 height=400
             )
