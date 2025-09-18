@@ -20,6 +20,34 @@ SCOPE = ["https://spreadsheets.google.com/feeds",
 CACHE_DURATION = 180  # 3 minutos em segundos
 SENHA_ADMIN = "Telemetria@2025"  # Senha para modificar operações e veículos
 
+# Dados de usuários para autenticação
+USUARIOS = {
+    "lucas.alves@transmaroni.com.br": {
+        "senha": "Maroni@25",
+        "nome": "Lucas Roberto de Sousa Alves"
+    },
+    "amanda.soares@transmaroni.com.br": {
+        "senha": "Maroni@25",
+        "nome": "Amanda Lima Soares"
+    },
+    "james.rosario@transmaroni.com.br": {
+        "senha": "Maroni@25",
+        "nome": "James Marques Do Rosario"
+    },
+    "henrique.araujo@transmaroni.com.br": {
+        "senha": "Maroni@25",
+        "nome": "Henrique Torres Araujo"
+    },
+    "amanda.carvalho@transmaroni.com.br": {
+        "senha": "Maroni@25",
+        "nome": "Amanda Stefane Santos Carvalho"
+    },
+    "giovanna.oliveira@transmaroni.com.br": {
+        "senha": "Maroni@25",
+        "nome": "Giovanna Assunção de Oliveira"
+    }
+}
+
 # -------------------- FUNÇÕES SUPER OTIMIZADAS --------------------
 @st.cache_resource(show_spinner=False, ttl=3600)
 def get_google_sheets_client():
@@ -89,7 +117,7 @@ def carregar_dados_otimizado(_client, sheet_id):
 def converter_datetime_para_string(obj):
     """Função auxiliar para converter datetime para string durante a serialização"""
     if isinstance(obj, (datetime, pd.Timestamp)):
-        return obj.strftime('%Y-%m-%d %H:%M:%S')
+        return obj.strftime('%d/%m/%Y %H:%M:%S')
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 def salvar_dados_eficiente(_client, sheet_id, aba_nome, df):
@@ -108,7 +136,7 @@ def salvar_dados_eficiente(_client, sheet_id, aba_nome, df):
             df = df.copy()
             for col in df.columns:
                 if pd.api.types.is_datetime64_any_dtype(df[col]):
-                    df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+                    df[col] = df[col].dt.strftime('%d/%m/%Y %H:%M:%S')
                 # Converte outros tipos de dados problemáticos
                 elif pd.api.types.is_numeric_dtype(df[col]):
                     df[col] = df[col].fillna(0)
@@ -146,7 +174,7 @@ def inicializar_sistema():
 def criar_metric_card(title, value, icon="📊", delta=None):
     """Cria um card de métrica estilizado"""
     card_html = f"""
-    <div style="background: linear-gradient(135deg, #FF8C00 0%, #FFD700 100%); 
+    <div style="background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); 
                 padding: 1.5rem; 
                 border-radius: 12px; 
                 color: white; 
@@ -174,7 +202,7 @@ def criar_filtros_avancados(df_atendimentos, df_operacoes):
                 max_date = datas_validas['DATA_ABORDAGEM'].max().date()
                 data_range = st.date_input(
                     "📅 Período",
-                    value=(min_date, max_date),
+                    value=(),
                     min_value=min_date,
                     max_value=max_date,
                     key="filtro_data"
@@ -191,7 +219,7 @@ def criar_filtros_avancados(df_atendimentos, df_operacoes):
             operacao_filtro = st.multiselect(
                 "👑 Operação Titular",
                 options=operacoes_titulares,
-                default=operacoes_titulares[:3] if len(operacoes_titulares) > 3 else operacoes_titulares,
+                default=[],
                 key="filtro_operacao_titular"
             )
     
@@ -202,7 +230,7 @@ def criar_filtros_avancados(df_atendimentos, df_operacoes):
             status_filtro = st.multiselect(
                 "🔧 Status Revisão",
                 options=status_options,
-                default=status_options,
+                default=[],
                 key="filtro_status"
             )
     
@@ -211,6 +239,43 @@ def criar_filtros_avancados(df_atendimentos, df_operacoes):
         'operacao_filtro': operacao_filtro,
         'status_filtro': status_filtro
     }
+
+# -------------------- SISTEMA DE AUTENTICAÇÃO --------------------
+def autenticar_usuario():
+    """Sistema de autenticação de usuários"""
+    if 'autenticado' not in st.session_state:
+        st.session_state.autenticado = False
+        st.session_state.usuario = None
+        st.session_state.nome_usuario = None
+    
+    if not st.session_state.autenticado:
+        st.title("🔐 Sistema de Abordagens - Login")
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            with st.form("login_form"):
+                st.subheader("Acesso ao Sistema")
+                email = st.text_input("📧 E-mail", placeholder="seu.email@transmaroni.com.br")
+                senha = st.text_input("🔒 Senha", type="password", placeholder="Sua senha")
+                
+                submitted = st.form_submit_button("🚀 Entrar no Sistema")
+                
+                if submitted:
+                    if email in USUARIOS and USUARIOS[email]["senha"] == senha:
+                        st.session_state.autenticado = True
+                        st.session_state.usuario = email
+                        st.session_state.nome_usuario = USUARIOS[email]["nome"]
+                        st.success(f"✅ Bem-vindo(a), {USUARIOS[email]['nome']}!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("❌ E-mail ou senha incorretos. Tente novamente.")
+            
+            st.info("💡 Use seu e-mail corporativo e senha fornecidos pela empresa.")
+        
+        st.stop()
+    
+    return st.session_state.nome_usuario
 
 # -------------------- INTERFACE PRINCIPAL --------------------
 def main():
@@ -221,15 +286,18 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # CSS Avançado para melhor UX - Tema amarelo/laranja
+    # Autenticar usuário
+    nome_usuario = autenticar_usuario()
+    
+    # CSS Avançado para melhor UX - Tema amarelo mais intenso
     st.markdown("""
     <style>
         .main-header { 
             font-size: 2.5rem; 
             color: white; 
             text-align: left; 
-            margin-bottom: 2rem;
-            background: linear-gradient(135deg, #FF8C00 0%, #FFD700 100%);
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             font-weight: bold;
@@ -242,7 +310,7 @@ def main():
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
         }
         .logo-img {
             height: 80px;
@@ -250,7 +318,7 @@ def main():
             margin-top: -2rem;
         }
         .stButton>button {
-            background: linear-gradient(135deg, #FF8C00 0%, #FFD700 100%);
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
             color: white;
             border: none;
             border-radius: 8px;
@@ -260,10 +328,10 @@ def main():
         }
         .stButton>button:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3);
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
         }
         .metric-card {
-            background: linear-gradient(135deg, #FF8C00 0%, #FFD700 100%);
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
             padding: 1.5rem;
             border-radius: 12px;
             color: white;
@@ -271,7 +339,7 @@ def main():
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         .sidebar .sidebar-content {
-            background: linear-gradient(180deg, #FF8C00 0%, #FFD700 100%);
+            background: linear-gradient(180deg, #FFD700 0%, #FFA500 100%);
             color: white;
         }
         .placa-validada {
@@ -286,13 +354,55 @@ def main():
             gap: 8px;
         }
         .stTabs [data-baseweb="tab"] {
-            background: linear-gradient(135deg, #FFA500 0%, #FFD700 100%);
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
             color: white;
             border-radius: 8px 8px 0px 0px;
             padding: 10px 16px;
         }
         .stTabs [aria-selected="true"] {
-            background: linear-gradient(135deg, #FF8C00 0%, #FFA500 100%) !important;
+            background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%) !important;
+        }
+        .card-indicador {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            margin: 0.5rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .table-operacoes {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #FFD700;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 1rem;
+        }
+        .selected-operation {
+            background-color: #FFD700 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+        .btn-excluir {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+            margin-left: 0.5rem;
+        }
+        .btn-editar {
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%) !important;
+        }
+        .info-oculta {
+            display: none !important;
+        }
+        .meta-atingida {
+            background-color: #d4edda !important;
+            color: #155724 !important;
+            font-weight: bold;
+        }
+        .meta-nao-atingida {
+            background-color: #f8d7da !important;
+            color: #721c24 !important;
+            font-weight: bold;
         }
     </style>
     """, unsafe_allow_html=True)
@@ -307,9 +417,10 @@ def main():
     
     # Menu lateral moderno
     with st.sidebar:
-        st.markdown("""
+        st.markdown(f"""
         <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: white; margin-bottom: 2rem;">🚛 Sistema de Abordagens</h1>
+            <h1 style="color: white; margin-bottom: 1rem;">🚛 Sistema de Abordagens</h1>
+            <p style="color: white; margin-bottom: 1rem;">👤 {nome_usuario}</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -320,11 +431,14 @@ def main():
         
         st.sidebar.markdown("---")
         
-        # Informações do usuário
-        usuario = st.text_input("👤 Seu nome", value="Fiscal", key="user_name")
-        
         if st.button("🔄 Atualizar Dados", use_container_width=True, key="refresh_button"):
             st.cache_data.clear()
+            st.rerun()
+        
+        if st.button("🚪 Sair", use_container_width=True, key="logout_button"):
+            st.session_state.autenticado = False
+            st.session_state.usuario = None
+            st.session_state.nome_usuario = None
             st.rerun()
         
         st.info("💡 Dados atualizados a cada 3 minutos")
@@ -334,9 +448,9 @@ def main():
         # Header com título e logo
         col_title, col_logo = st.columns([3, 1])
         with col_title:
-            st.markdown('<h1 class="main-header">Dashboard de Abordados</h1>', unsafe_allow_html=True)
+            st.markdown('<h1 class="main-header">Gestão de Abordados Telemetria</h1>', unsafe_allow_html=True)
         with col_logo:
-            # Espaço para logo - você pode substituir pela URL da sua imagem
+            # Imagem no canto superior direito
             st.markdown("""
             <div style="text-align: right;">
                 <img src="https://cdn-icons-png.flaticon.com/512/1006/1006555.png" class="logo-img" alt="Logo">
@@ -348,8 +462,15 @@ def main():
             operacao_titular_map = df_operacoes.set_index('OPERAÇÃO')['OPERAÇÃO TITULAR'].to_dict()
             df_atendimentos['OPERAÇÃO TITULAR'] = df_atendimentos['OPERACAO'].map(operacao_titular_map)
         
-        # Métricas em tempo real
-        col1, col2, col3, col4 = st.columns(4)
+        # Lançamentos do dia
+        st.subheader("📈 Lançamentos do Dia")
+        hoje = datetime.now().date()
+        lancamentos_hoje = 0
+        if not df_atendimentos.empty and 'DATA_LANCAMENTO' in df_atendimentos.columns:
+            df_atendimentos['DATA_LANCAMENTO'] = pd.to_datetime(df_atendimentos['DATA_LANCAMENTO'], errors='coerce')
+            lancamentos_hoje = len(df_atendimentos[df_atendimentos['DATA_LANCAMENTO'].dt.date == hoje])
+        
+        col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
             st.metric("🚗 Total de Veículos", len(df_veiculos), help="Veículos cadastrados no sistema")
@@ -368,6 +489,9 @@ def main():
             else:
                 st.metric("⭐ Média Geral", "0.00")
         
+        with col5:
+            st.metric("📅 Lançamentos Hoje", lancamentos_hoje, help="Atendimentos registrados hoje")
+        
         # Gráficos otimizados - usando OPERAÇÃO TITULAR
         if not df_atendimentos.empty and 'OPERAÇÃO TITULAR' in df_atendimentos.columns:
             col1, col2 = st.columns(2)
@@ -379,7 +503,7 @@ def main():
                     values=operacao_count.values, 
                     names=operacao_count.index, 
                     title="📊 Atendimentos por Operação Titular",
-                    color_discrete_sequence=px.colors.sequential.Oranges_r
+                    color_discrete_sequence=px.colors.sequential.YlOrRd
                 )
                 st.plotly_chart(fig, use_container_width=True)
             
@@ -392,7 +516,7 @@ def main():
                     title="📈 Quantidade de Atendimentos por Operação Titular",
                     labels={'x': 'Operação Titular', 'y': 'Quantidade de Atendimentos'},
                     color=operacao_count_bar.values,
-                    color_continuous_scale="oranges"
+                    color_continuous_scale="ylorrd"
                 )
                 fig_bar.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig_bar, use_container_width=True)
@@ -408,10 +532,26 @@ def main():
                 y='MEDIA_ATENDIMENTO',
                 title="Média de Atendimento por Operação Titular",
                 color='MEDIA_ATENDIMENTO',
-                color_continuous_scale="oranges"
+                color_continuous_scale="ylorrd"
             )
             fig.update_layout(yaxis_tickformat=".2f", xaxis_tickangle=-45)
             st.plotly_chart(fig, use_container_width=True)
+        
+        # Gráfico de registros por colaborador
+        if not df_atendimentos.empty and 'COLABORADOR' in df_atendimentos.columns:
+            st.subheader("📊 Registros por Colaborador")
+            colaborador_count = df_atendimentos['COLABORADOR'].value_counts()
+            
+            fig_colab = px.bar(
+                x=colaborador_count.index,
+                y=colaborador_count.values,
+                title="Quantidade de Registros por Colaborador",
+                labels={'x': 'Colaborador', 'y': 'Quantidade de Registros'},
+                color=colaborador_count.values,
+                color_continuous_scale="ylorrd"
+            )
+            fig_colab.update_layout(xaxis_tickangle=-45)
+            st.plotly_chart(fig_colab, use_container_width=True)
         
         # Últimos registros
         st.subheader("📋 Últimos Atendimentos")
@@ -460,7 +600,8 @@ def main():
                         'MODELO': [modelo],
                         'TIPO': [tipo],
                         'META': [meta],
-                        'DATA_CRIACAO': [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+                        'DATA_CRIACAO': [datetime.now().strftime("%d/%m/%Y %H:%M:%S")],
+                        'CRIADO_POR': [nome_usuario]
                     })
                     
                     df_operacoes = pd.concat([df_operacoes, nova_operacao], ignore_index=True)
@@ -473,17 +614,55 @@ def main():
         
         with col2:
             st.subheader("📋 Operações Cadastradas")
+            
+            # Botão de exportação
+            if not df_operacoes.empty:
+                # Converter para Excel
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_operacoes.to_excel(writer, index=False, sheet_name='Operações')
+                excel_data = output.getvalue()
+                
+                st.download_button(
+                    label="📤 Exportar para Excel",
+                    data=excel_data,
+                    file_name=f"operacoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            
             if not df_operacoes.empty:
                 # Formatar META com 2 casas decimais
                 df_display = df_operacoes.copy()
                 if 'META' in df_display.columns:
                     df_display['META'] = df_display['META'].round(2)
                 
+                # Exibir tabela
                 st.dataframe(
                     df_display[['OPERAÇÃO', 'OPERAÇÃO TITULAR', 'MARCA', 'MODELO', 'TIPO', 'META', 'DATA_CRIACAO']],
                     use_container_width=True,
                     height=400
                 )
+                
+                # Controles de exclusão
+                st.subheader("🗑️ Excluir Operação")
+                operacao_excluir = st.selectbox(
+                    "Selecione a operação para excluir:",
+                    options=df_operacoes['OPERAÇÃO'].tolist(),
+                    key="operacao_excluir_select"
+                )
+                
+                senha_exclusao = st.text_input("🔒 Digite a senha de administração para excluir:", type="password", key="senha_exclusao_operacao")
+                
+                if st.button("🗑️ Confirmar Exclusão", use_container_width=True, disabled=not senha_exclusao):
+                    if senha_exclusao == SENHA_ADMIN:
+                        df_operacoes = df_operacoes[df_operacoes['OPERAÇÃO'] != operacao_excluir].reset_index(drop=True)
+                        if salvar_dados_eficiente(client, SHEET_ID, "operacoes", df_operacoes):
+                            st.success(f"✅ Operação {operacao_excluir} excluída com sucesso!")
+                            time.sleep(1)
+                            st.rerun()
+                    else:
+                        st.error("❌ Senha incorreta. Não é possível excluir.")
             else:
                 st.info("Nenhuma operação cadastrada ainda.")
 
@@ -496,13 +675,16 @@ def main():
             st.session_state.operacao_selecionada = None
         if 'placa_digitada' not in st.session_state:
             st.session_state.placa_digitada = ""
+        if 'ocultar_info' not in st.session_state:
+            st.session_state.ocultar_info = False
         
-        col1, col2 = st.columns(2)
+        # Layout em 3 colunas
+        col1, col2, col3 = st.columns([1, 1, 1])
         
         with col1:
-            # Campo de placa com validação
             st.subheader("🚗 Informações do Veículo")
             
+            # Campo de placa com validação
             placa_digitada = st.text_input("🔢 DIGITE A PLACA", value=st.session_state.placa_digitada, 
                                          placeholder="Ex: ABC1234", key="placa_input")
             
@@ -517,123 +699,174 @@ def main():
                     st.success(f"✅ Placa encontrada: {placa_digitada.upper()}")
                     
                     # Exibir informações do veículo
-                    st.text_input("🏭 MARCA", value=veiculo_info.get("MARCA", ""), disabled=True, key="marca_veiculo")
-                    st.text_input("🔧 MODELO", value=veiculo_info.get("MODELO", ""), disabled=True, key="modelo_veiculo")
-                    st.text_input("📋 TIPO", value=veiculo_info.get("TIPO", ""), disabled=True, key="tipo_veiculo")
-                    st.text_input("🏢 OPERAÇÃO", value=veiculo_info.get("OPERAÇÃO", ""), disabled=True, key="operacao_veiculo")
+                    marca_value = veiculo_info.get("MARCA", "")
+                    modelo_value = veiculo_info.get("MODELO", "")
+                    tipo_value = veiculo_info.get("TIPO", "")
+                    operacao_value = veiculo_info.get("OPERAÇÃO", "")
+                    
+                    st.text_input("🏭 MARCA", value=marca_value, disabled=True, key="marca_veiculo")
+                    st.text_input("🔧 MODELO", value=modelo_value, disabled=True, key="modelo_veiculo")
+                    st.text_input("📋 TIPO", value=tipo_value, disabled=True, key="tipo_veiculo")
+                    st.text_input("🏢 OPERAÇÃO", value=operacao_value, disabled=True, key="operacao_veiculo")
                     
                 else:
                     st.error("❌ Placa não encontrada. Verifique o cadastro do veículo.")
             
             # Campo de motorista livre
             motorista = st.text_input("👤 MOTORISTA", placeholder="Digite o nome do motorista", key="motorista_input")
-            
-            # Informações da abordagem
-            st.subheader("📋 Informações da Abordagem")
-            data_abordagem = st.date_input("📅 DATA DE ABORDAGEM", value=datetime.today(), key="data_abordagem")
-            revisao = st.selectbox("🔧 REVISÃO", options=["Em dia", "Atrasada", "Não se aplica"], key="revisao_select")
-            tacografo = st.selectbox("📊 TACÓGRAFO", options=["OK", "Com problemas", "Não verificado"], key="tacografo_select")
         
         with col2:
-            st.subheader("🏢 Seleção de Operação e Meta")
+            st.subheader("📋 Informações da Abordagem")
+            data_abordagem = st.date_input("📅 DATA DE ABORDAGEM", value=datetime.today(), key="data_abordagem")
+            revisao = st.selectbox("🔧 REVISÃO", options=["REVISÃO EM DIA", "PENDENTE"], key="revisao_select")
+            tacografo = st.selectbox("📊 TACÓGRAFO", options=["TACÓGRAFO EM DIA", "PENDENTE"], key="tacografo_select")
             
-            # Seleção de operação com tabela
-            if not df_operacoes.empty:
-                # Exibir tabela de operações para seleção
-                st.info("📋 Selecione uma operação na tabela abaixo:")
-                
-                # Preparar dados para exibição
-                operacoes_display = df_operacoes[['OPERAÇÃO TITULAR', 'OPERAÇÃO', 'META', 'TIPO']].copy()
-                operacoes_display['META'] = operacoes_display['META'].round(2)
-                operacoes_display['SELECIONAR'] = False
-                
-                # Criar interface de seleção
-                edited_df = st.data_editor(
-                    operacoes_display,
-                    hide_index=True,
-                    use_container_width=True,
-                    height=200,
-                    column_config={
-                        "SELECIONAR": st.column_config.CheckboxColumn(
-                            "Selecionar",
-                            help="Selecione a operação",
-                            default=False,
-                        ),
-                        "META": st.column_config.NumberColumn(
-                            format="%.2f"
-                        )
-                    },
-                    disabled=["OPERAÇÃO TITULAR", "OPERAÇÃO", 'META', "TIPO"],
-                    key="operacoes_table"
-                )
-                
-                # Verificar qual operação foi selecionada
-                operacao_selecionada = None
-                meta_selecionada = 0.0
-                tipo_selecionado = ""
-                operacao_titular_selecionada = ""
-                
-                for idx, row in edited_df.iterrows():
-                    if row['SELECIONAR']:
-                        operacao_selecionada = row['OPERAÇÃO']
-                        meta_selecionada = row['META']
-                        tipo_selecionado = row['TIPO']
-                        operacao_titular_selecionada = row['OPERAÇÃO TITULAR']
-                        break
-                
-                if operacao_selecionada:
-                    st.session_state.operacao_selecionada = operacao_selecionada
-                    st.success(f"✅ Operação selecionada: {operacao_selecionada}")
-                    
-                    # Exibir informações da operação selecionada
-                    st.text_input("👑 OPERAÇÃO TITULAR", value=operacao_titular_selecionada, disabled=True)
-                    st.text_input("🎯 META", value=f"{meta_selecionada:.2f}", disabled=True)
-                    st.text_input("📋 TIPO", value=tipo_selecionado, disabled=True)
-                else:
-                    st.warning("⚠️ Selecione uma operação na tabela acima")
-            
-            # Período do atendimento
+            # Observação
+            observacao = st.text_area("📝 OBSERVAÇÃO", placeholder="Digite observações relevantes sobre o atendimento...", 
+                                    height=100, key="observacao_text")
+        
+        with col3:
             st.subheader("⏰ Período do Atendimento")
             data_inicio = st.date_input("📅 DATA INÍCIO", value=datetime.today(), key="data_inicio")
             data_fim = st.date_input("📅 DATA FIM", value=datetime.today() + timedelta(days=7), key="data_fim")
             
             # Média de atendimento
             media_atendimento = st.number_input("⭐ MÉDIA ATENDIMENTO", min_value=0.0, format="%.2f", key="media_atendimento")
+        
+        # SELEÇÃO DE OPERAÇÃO (abaixo das 3 colunas)
+        st.subheader("🏢 Seleção de Operação")
+        
+        # Barra de pesquisa para operação titular
+        pesquisa_operacao = st.text_input("🔍 Pesquisar por Operação Titular:", 
+                                        placeholder="Digite o nome da operação titular",
+                                        key="pesquisa_operacao")
+        
+        # Filtrar operações com base na pesquisa
+        df_operacoes_filtrado = df_operacoes.copy()
+        if pesquisa_operacao:
+            df_operacoes_filtrado = df_operacoes_filtrado[
+                df_operacoes_filtrado['OPERAÇÃO TITULAR'].str.contains(pesquisa_operacao, case=False, na=False) |
+                df_operacoes_filtrado['OPERAÇÃO'].str.contains(pesquisa_operacao, case=False, na=False)
+            ]
+        
+        # Tabela de operações para seleção
+        st.markdown("**📋 Selecione uma operação:**")
+        
+        # Preparar dados para exibição
+        operacoes_display = df_operacoes_filtrado[['OPERAÇÃO', 'OPERAÇÃO TITULAR', 'MARCA', 'MODELO', 'TIPO', 'META']].copy()
+        operacoes_display['META'] = operacoes_display['META'].round(2)
+        operacoes_display['SELECIONAR'] = False
+        
+        # Adicionar índice para seleção
+        operacoes_display['ID'] = range(1, len(operacoes_display) + 1)
+        
+        # Criar interface de seleção
+        edited_df = st.data_editor(
+            operacoes_display[['SELECIONAR', 'ID', 'OPERAÇÃO', 'OPERAÇÃO TITULAR', 'MARCA', 'MODELO', 'TIPO', 'META']],
+            hide_index=True,
+            use_container_width=True,
+            height=200,
+            column_config={
+                "SELECIONAR": st.column_config.CheckboxColumn(
+                    "Selecionar",
+                    help="Selecione a operação",
+                    default=False,
+                    width="small"
+                ),
+                "ID": st.column_config.NumberColumn(
+                    "ID",
+                    help="Identificador",
+                    width="small"
+                ),
+                "OPERAÇÃO": st.column_config.TextColumn(
+                    "Operação",
+                    width="medium"
+                ),
+                "OPERAÇÃO TITULAR": st.column_config.TextColumn(
+                    "Titular",
+                    width="medium"
+                ),
+                "MARCA": st.column_config.TextColumn(
+                    "Marca",
+                    width="small"
+                ),
+                "MODELO": st.column_config.TextColumn(
+                    "Modelo",
+                    width="small"
+                ),
+                "TIPO": st.column_config.TextColumn(
+                    "Tipo",
+                    width="small"
+                ),
+                "META": st.column_config.NumberColumn(
+                    "Meta",
+                    format="%.2f",
+                    width="small"
+                )
+            },
+            disabled=["ID", "OPERAÇÃO", "OPERAÇÃO TITULAR", "MARCA", "MODELO", "TIPO", "META"],
+            key="operacoes_table"
+        )
+        
+        # Verificar qual operação foi selecionada
+        operacao_selecionada = None
+        operacao_info_selecionada = None
+        
+        for idx, row in edited_df.iterrows():
+            if row['SELECIONAR']:
+                operacao_selecionada = row['OPERAÇÃO']
+                # Encontrar informações completas da operação selecionada
+                operacao_info_selecionada = df_operacoes[df_operacoes['OPERAÇÃO'] == operacao_selecionada].iloc[0]
+                break
+        
+        if operacao_selecionada:
+            st.session_state.operacao_selecionada = operacao_selecionada
+            st.success(f"✅ Operação selecionada: {operacao_selecionada}")
             
-            # Informações do colaborador
-            st.subheader("👨‍💼 Informações do Colaborador")
-            colaborador = st.text_input("🧑‍💼 COLABORADOR", value=usuario, key="colaborador_input")
-            observacao = st.text_area("📝 OBSERVAÇÃO", placeholder="Digite observações relevantes sobre o atendimento...", key="observacao_text")
+            # Exibir informações da operação selecionada
+            col_info1, col_info2, col_info3 = st.columns(3)
+            with col_info1:
+                st.text_input("👑 OPERAÇÃO TITULAR", value=operacao_info_selecionada.get("OPERAÇÃO TITULAR", ""), disabled=True)
+            with col_info2:
+                st.text_input("🎯 META", value=f"{operacao_info_selecionada.get('META', 0):.2f}", disabled=True)
+            with col_info3:
+                st.text_input("📋 TIPO", value=operacao_info_selecionada.get("TIPO", ""), disabled=True)
+        else:
+            st.warning("⚠️ Selecione uma operação na tabela acima")
         
         # Botão de envio
-        enviar = st.button("✅ ENVIAR ATENDIMENTO", type="primary", use_container_width=True)
+        st.subheader("✅ Confirmar Atendimento")
+        enviar = st.button("🚀 ENVIAR ATENDIMENTO", type="primary", use_container_width=True)
         
         if enviar:
             # Validações antes do envio
             if not placa_digitada or veiculo_info is None:
                 st.error("❌ Por favor, digite uma placa válida cadastrada no sistema.")
             elif not st.session_state.operacao_selecionada:
-                st.error("❌ Por favor, selecione uma operação na tabela.")
+                st.error("❌ Por favor, selecione uma operação.")
             elif not motorista:
                 st.error("❌ Por favor, digite o nome do motorista.")
             else:
+                # Buscar informações da operação selecionada
+                operacao_info = df_operacoes[df_operacoes['OPERAÇÃO'] == st.session_state.operacao_selecionada].iloc[0]
+                
                 novo_atendimento = pd.DataFrame({
                     "MOTORISTA": [motorista],
-                    "COLABORADOR": [colaborador],
-                    "DATA_ABORDAGEM": [data_abordagem.strftime("%Y-%m-%d")],
-                    "DATA_LANCAMENTO": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                    "COLABORADOR": [nome_usuario],
+                    "DATA_ABORDAGEM": [data_abordagem.strftime("%d/%m/%Y")],
+                    "DATA_LANCAMENTO": [datetime.now().strftime("%d/%m/%Y %H:%M:%S")],
                     "PLACA": [placa_digitada.upper()],
                     "MODELO": [veiculo_info.get("MODELO", "")],
                     "REVISAO": [revisao],
                     "TACOGRAFO": [tacografo],
                     "OPERACAO": [st.session_state.operacao_selecionada],
-                    "DATA_INICIO": [data_inicio.strftime("%Y-%m-%d")],
-                    "DATA_FIM": [data_fim.strftime("%Y-%m-%d")],
-                    "META": [meta_selecionada],
+                    "DATA_INICIO": [data_inicio.strftime("%d/%m/%Y")],
+                    "DATA_FIM": [data_fim.strftime("%d/%m/%Y")],
+                    "META": [operacao_info.get("META", 0)],
                     "MEDIA_ATENDIMENTO": [round(media_atendimento, 2)],
                     "OBSERVACAO": [observacao],
-                    "DATA_MODIFICACAO": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
-                    "MODIFICADO_POR": [usuario]
+                    "DATA_MODIFICACAO": [datetime.now().strftime("%d/%m/%Y %H:%M:%S")],
+                    "MODIFICADO_POR": [nome_usuario]
                 })
                 
                 df_atendimentos = pd.concat([df_atendimentos, novo_atendimento], ignore_index=True)
@@ -649,137 +882,221 @@ def main():
 
     # ----------------------- VEÍCULOS -----------------------
     elif "🚗 Veículos" in menu:
-        st.markdown('<h1 class="main-header">Gestão de Veículos</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 class="main-header">Consulta de Veículos</h1>', unsafe_allow_html=True)
         
-        # Verificação de senha para modificações
-        senha = st.text_input("🔒 Senha de Administração", type="password", key="senha_veiculos")
-        acesso_permitido = senha == SENHA_ADMIN
-        
-        if not acesso_permitido and senha:
-            st.error("❌ Senha incorreta. Acesso não autorizado.")
+        # Indicadores de veículos
+        if not df_veiculos.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>🚗 Total</h3>
+                    <h2>{len(df_veiculos)}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                urbanos = len(df_veiculos[df_veiculos['TIPO'] == 'URBANO']) if 'TIPO' in df_veiculos.columns else 0
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>🏙️ Urbanos</h3>
+                    <h2>{urbanos}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                longos = len(df_veiculos[df_veiculos['TIPO'] == 'LONGO CURSO']) if 'TIPO' in df_veiculos.columns else 0
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>🛣️ Longo Curso</h3>
+                    <h2>{longos}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                outros = len(df_veiculos[~df_veiculos['TIPO'].isin(['URBANO', 'LONGO CURSO'])]) if 'TIPO' in df_veiculos.columns else 0
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>📦 Outros</h3>
+                    <h2>{outros}</h2>
+                </div>
+                """, unsafe_allow_html=True)
         
         # Campo de pesquisa de placa
         st.subheader("🔍 Pesquisar Veículo")
         pesquisa_placa = st.text_input("Digite a placa para pesquisar:", placeholder="Ex: ABC1234", key="pesquisa_placa")
         
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.subheader("➕ Adicionar Novo Veículo")
+        # Botão de exportação
+        if not df_veiculos.empty:
+            # Converter para Excel
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_veiculos.to_excel(writer, index=False, sheet_name='Veículos')
+            excel_data = output.getvalue()
             
-            with st.form("novo_veiculo", clear_on_submit=True):
-                placa = st.text_input("🚗 PLACA", key="veiculo_placa", disabled=not acesso_permitido)
-                marca = st.text_input("🏭 MARCA", key="veiculo_marca", disabled=not acesso_permitido)
-                modelo = st.text_input("🔧 MODELO", key="veiculo_modelo", disabled=not acesso_permitido)
-                operacao = st.text_input("🏢 OPERAÇÃO", key="veiculo_operacao", disabled=not acesso_permitido)
-                proprietario = st.text_input("👑 PROPRIETÁRIO", key="veiculo_proprietario", disabled=not acesso_permitido)
-                locado = st.selectbox("🏢 LOCADO", options=["Sim", "Não"], key="veiculo_locado", disabled=not acesso_permitido)
-                motorista = st.text_input("👤 MOTORISTA", key="veiculo_motorista", disabled=not acesso_permitido)
-                tipo = st.selectbox("📋 TIPO", options=["LONGO CURSO", "URBANO", "REGIONAL", "OUTRO"], key="veiculo_tipo", disabled=not acesso_permitido)
-                
-                submitted = st.form_submit_button("✅ Adicionar Veículo", use_container_width=True, disabled=not acesso_permitido)
-                
-                if submitted and acesso_permitido:
-                    novo_veiculo = pd.DataFrame({
-                        'PLACA': [placa.upper()],
-                        'MARCA': [marca],
-                        'MODELO': [modelo],
-                        'OPERAÇÃO': [operacao],
-                        'PROPRIETÁRIO': [proprietario],
-                        'LOCADO': [locado],
-                        'MOTORISTA': [motorista],
-                        'TIPO': [tipo],
-                        'DATA_CADASTRO': [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
-                    })
-                    
-                    df_veiculos = pd.concat([df_veiculos, novo_veiculo], ignore_index=True)
-                    if salvar_dados_eficiente(client, SHEET_ID, "veiculos", df_veiculos):
-                        st.success("✅ Veículo adicionado com sucesso!")
-                        time.sleep(1)
-                        st.rerun()
-                elif submitted and not acesso_permitido:
-                    st.error("❌ Acesso não autorizado. Digite a senha correta.")
+            st.download_button(
+                label="📤 Exportar para Excel",
+                data=excel_data,
+                file_name=f"veiculos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
         
-        with col2:
-            st.subheader("📋 Veículos Cadastrados")
-            if not df_veiculos.empty:
-                # Aplicar filtro de pesquisa se houver
-                df_display = df_veiculos.copy()
-                if pesquisa_placa:
-                    df_display = df_display[df_display['PLACA'].str.contains(pesquisa_placa.upper(), na=False)]
-                
-                st.dataframe(
-                    df_display[['PLACA', 'MARCA', 'MODELO', 'OPERAÇÃO', 'PROPRIETÁRIO', 'LOCADO', 'MOTORISTA', 'TIPO', 'DATA_CADASTRO']],
-                    use_container_width=True,
-                    height=400
-                )
-                
-                if pesquisa_placa and len(df_display) == 0:
-                    st.info("Nenhum veículo encontrado com a placa informada.")
-            else:
-                st.info("Nenhum veículo cadastrado ainda.")
+        st.subheader("📋 Veículos Cadastrados")
+        if not df_veiculos.empty:
+            # Aplicar filtro de pesquisa se houver
+            df_display = df_veiculos.copy()
+            if pesquisa_placa:
+                df_display = df_display[df_display['PLACA'].str.contains(pesquisa_placa.upper(), na=False)]
+            
+            st.dataframe(
+                df_display[['PLACA', 'MARCA', 'MODELO', 'OPERAÇÃO', 'PROPRIETÁRIO', 'TIPO', 'DATA_CADASTRO']],
+                use_container_width=True,
+                height=400
+            )
+        else:
+            st.info("Nenhum veículo cadastrado ainda.")
 
     # ----------------------- HISTÓRICO -----------------------
     elif "📋 Histórico" in menu:
         st.markdown('<h1 class="main-header">Histórico de Atendimentos</h1>', unsafe_allow_html=True)
         
-        # Adicionar OPERAÇÃO TITULAR aos dados de atendimento
-        if not df_atendimentos.empty and not df_operacoes.empty:
-            operacao_titular_map = df_operacoes.set_index('OPERAÇÃO')['OPERAÇÃO TITULAR'].to_dict()
-            df_atendimentos['OPERAÇÃO TITULAR'] = df_atendimentos['OPERACAO'].map(operacao_titular_map)
+        # Indicadores de histórico
+        if not df_atendimentos.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>📋 Total</h3>
+                    <h2>{len(df_atendimentos)}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                hoje = datetime.now().date()
+                hoje_count = len(df_atendimentos[pd.to_datetime(df_atendimentos['DATA_ABORDAGEM']).dt.date == hoje])
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>📅 Hoje</h3>
+                    <h2>{hoje_count}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                media_geral = df_atendimentos['MEDIA_ATENDIMENTO'].mean()
+                media_formatada = f"{media_geral:.2f}" if not pd.isna(media_geral) else "0.00"
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>⭐ Média</h3>
+                    <h2>{media_formatada}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col4:
+                em_dia = len(df_atendimentos[df_atendimentos['REVISAO'] == 'REVISÃO EM DIA']) if 'REVISAO' in df_atendimentos.columns else 0
+                st.markdown(f"""
+                <div class="card-indicador">
+                    <h3>✅ Em dia</h3>
+                    <h2>{em_dia}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Botão de exportação
+        if not df_atendimentos.empty:
+            # Converter para Excel
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df_atendimentos.to_excel(writer, index=False, sheet_name='Atendimentos')
+            excel_data = output.getvalue()
+            
+            st.download_button(
+                label="📤 Exportar para Excel",
+                data=excel_data,
+                file_name=f"historico_atendimentos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
         
         # Filtros avançados
+        st.subheader("🔍 Filtros")
         filtros = criar_filtros_avancados(df_atendimentos, df_operacoes)
         
         # Aplicar filtros
-        if not df_atendimentos.empty:
-            df_filtrado = df_atendimentos.copy()
-            
-            # Filtro de data
-            if filtros['data_range'] and len(filtros['data_range']) == 2:
-                start_date, end_date = filtros['data_range']
-                df_filtrado = df_filtrado[
-                    (df_filtrado['DATA_ABORDAGEM'].dt.date >= start_date) & 
-                    (df_filtrado['DATA_ABORDAGEM'].dt.date <= end_date)
-                ]
-            
-            # Filtro de operação titular
-            if filtros['operacao_filtro']:
-                df_filtrado = df_filtrado[df_filtrado['OPERAÇÃO TITULAR'].isin(filtros['operacao_filtro'])]
-            
-            # Filtro de status
-            if filtros['status_filtro']:
-                df_filtrado = df_filtrado[df_filtrado['REVISAO'].isin(filtros['status_filtro'])]
-            
-            # Estatísticas
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("📋 Total Filtrado", len(df_filtrado))
-            with col2:
-                st.metric("🚗 Veículos Únicos", df_filtrado['PLACA'].nunique())
-            with col3:
-                if not df_filtrado.empty and 'MEDIA_ATENDIMENTO' in df_filtrado.columns:
-                    media_filtrada = df_filtrado['MEDIA_ATENDIMENTO'].mean()
-                    media_formatada = f"{media_filtrada:.2f}" if not pd.isna(media_filtrada) else "0.00"
-                    st.metric("⭐ Média Filtrada", media_formatada)
-                else:
-                    st.metric("⭐ Média Filtrada", "0.00")
-            
-            # Formatar médias para exibição
+        df_filtrado = df_atendimentos.copy()
+        
+        if filtros['data_range'] and len(filtros['data_range']) == 2:
+            data_inicio, data_fim = filtros['data_range']
+            df_filtrado = df_filtrado[
+                (pd.to_datetime(df_filtrado['DATA_ABORDAGEM']).dt.date >= data_inicio) &
+                (pd.to_datetime(df_filtrado['DATA_ABORDAGEM']).dt.date <= data_fim)
+            ]
+        
+        if filtros['operacao_filtro']:
+            df_filtrado = df_filtrado[df_filtrado['OPERAÇÃO TITULAR'].isin(filtros['operacao_filtro'])]
+        
+        if filtros['status_filtro'] and 'REVISAO' in df_filtrado.columns:
+            df_filtrado = df_filtrado[df_filtrado['REVISAO'].isin(filtros['status_filtro'])]
+        
+        # Exibir histórico filtrado
+        st.subheader("📊 Histórico de Atendimentos")
+        if not df_filtrado.empty:
+            # Formatar colunas numéricas
             df_display = df_filtrado.copy()
             if 'MEDIA_ATENDIMENTO' in df_display.columns:
                 df_display['MEDIA_ATENDIMENTO'] = df_display['MEDIA_ATENDIMENTO'].round(2)
             if 'META' in df_display.columns:
                 df_display['META'] = df_display['META'].round(2)
             
-            # Tabela de dados
+            # Aplicar formatação condicional para META vs MEDIA_ATENDIMENTO
+            def color_meta(row):
+                if pd.notna(row['MEDIA_ATENDIMENTO']) and pd.notna(row['META']):
+                    if row['MEDIA_ATENDIMENTO'] >= row['META']:
+                        return ['background-color: #d4edda; color: #155724; font-weight: bold'] * len(row)
+                    else:
+                        return ['background-color: #f8d7da; color: #721c24; font-weight: bold'] * len(row)
+                return [''] * len(row)
+            
+            # Exibir dados com formatação
             st.dataframe(
-                df_display.sort_values('DATA_ABORDAGEM', ascending=False),
+                df_display[[
+                    'PLACA', 'MOTORISTA', 'DATA_ABORDAGEM', 'OPERACAO', 
+                    'OPERAÇÃO TITULAR', 'MEDIA_ATENDIMENTO', 'META', 'REVISAO', 'COLABORADOR'
+                ]].style.apply(color_meta, axis=1),
                 use_container_width=True,
                 height=400
             )
+            
+            # Controles de exclusão
+            st.subheader("🗑️ Excluir Atendimento")
+            atendimentos_options = [f"{i+1} - {row['PLACA']} - {row['DATA_ABORDAGEM']}" for i, row in df_filtrado.iterrows()]
+            
+            if atendimentos_options:
+                atendimento_excluir = st.selectbox(
+                    "Selecione o atendimento para excluir:",
+                    options=atendimentos_options,
+                    key="atendimento_excluir_select"
+                )
+                
+                if atendimento_excluir:
+                    # Extrair o índice do atendimento selecionado
+                    selected_index = atendimentos_options.index(atendimento_excluir)
+                    original_idx = df_filtrado.index[selected_index]
+                    
+                    senha_exclusao = st.text_input("🔒 Digite a senha de administração para excluir:", type="password", key="senha_exclusao_atendimento")
+                    
+                    if st.button("🗑️ Confirmar Exclusão", use_container_width=True, disabled=not senha_exclusao):
+                        if senha_exclusao == SENHA_ADMIN:
+                            df_atendimentos = df_atendimentos.drop(original_idx).reset_index(drop=True)
+                            if salvar_dados_eficiente(client, SHEET_ID, "atendimentos", df_atendimentos):
+                                st.success(f"✅ Atendimento excluído com sucesso!")
+                                time.sleep(1)
+                                st.rerun()
+                        else:
+                            st.error("❌ Senha incorreta. Não é possível excluir.")
         else:
-            st.info("Nenhum atendimento registrado ainda.")
+            st.info("Nenhum atendimento encontrado com os filtros aplicados.")
 
 if __name__ == "__main__":
     main()
